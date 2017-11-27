@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.metrics import r2_score, mean_squared_error as mse_score
+from sklearn.linear_model import Ridge
 
 
 def best_clr(X, y, k, kmeans_X=0.0, max_iter=100, num_tries=10):
@@ -31,6 +32,9 @@ def clr(X, y, k, kmeans_X=0.0, max_iter=100, labels=None, verbose=0):
       preds[:, cl_idx] = models[cl_idx].predict(X)
       scores[:, cl_idx] = (y - preds[:, cl_idx]) ** 2
       if np.sum(labels == cl_idx) == 0:
+        if verbose > 0:
+          print("Cluster vanished! Assigning random point")
+        labels[np.random.choice(X.shape[0])] = cl_idx
         continue
       if kmeans_X > 0:
         center = np.mean(X[labels == cl_idx], axis=0)
