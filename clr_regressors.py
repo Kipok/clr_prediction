@@ -1,15 +1,16 @@
 import numpy as np
-from sklearn.linear_model import LinearRegression, Ridge, LogisticRegression
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from scipy.spatial.distance import cdist
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
+from clr import best_clr
 
 
 class KPlaneLabelPredictor(BaseEstimator):
   def __init__(self, num_planes):
     self.num_planes = num_planes
+    self.n_classes_ = num_planes
 
   def fit(self, X, y):
     self.centers_ = np.empty((self.num_planes, X.shape[1]))
@@ -17,6 +18,7 @@ class KPlaneLabelPredictor(BaseEstimator):
       if np.sum(y == cl) == 0:
         # filling with inf empty clusters
         self.centers_[cl] = np.ones(X.shape[1]) * 1e5
+        continue
       self.centers_[cl] = np.mean(X[y == cl], axis=0)
 
   def predict(self, X):
@@ -95,7 +97,11 @@ class CLRpRegressor(BaseEstimator):
     X = check_array(X)
 
     if self.weighted:
-      planes_probs = self.clf.predict_proba(X)
+      if self.clf.n_classes_ == self.num_planes:
+        planes_probs = self.clf.predict_proba(X)
+      else:
+        planes_probs = np.zeros((X.shape[0], self.num_planes))
+        planes_probs[:, self.clf.classes_] = self.clf.predict_proba(X)
       preds = np.empty((X.shape[0], self.num_planes))
       for cl_idx in range(self.num_planes):
         preds[:,cl_idx] = self.models_[cl_idx].predict(X)
