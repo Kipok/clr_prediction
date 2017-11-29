@@ -7,6 +7,50 @@ from sklearn.model_selection import cross_val_score
 from clr import best_clr
 
 
+class CLRcRegressor(BaseEstimator):
+  def __init__(self, num_planes, kmeans_coef, constr_id, num_tries=1):
+    self.num_planes = num_planes
+    self.kmeans_coef = kmeans_coef
+    self.num_tries = num_tries
+    self.constr_id = constr_id
+
+  def fit(self, X, y, init_labels=None, max_iter=100,
+          seed=None, verbose=False):
+    if seed is not None:
+      np.random.seed(seed)
+    X, y = check_X_y(X, y)
+
+    constr = np.empty(X.shape[0], dtype=np.int)
+    for i, c_id in enumerate(np.unique(X[:, self.constr_id])):
+      constr[X[:, self.constr_id] == c_id] = i
+
+    self.labels_, self.models_, _ = best_clr(
+      X, y, k=self.num_planes, kmeans_X=self.kmeans_coef,
+      constr=constr, max_iter=max_iter, num_tries=self.num_tries,
+    )
+    # TODO: optimize this
+    self.constr_to_label = {}
+    for i in range(X.shape[0]):
+      self.constr_to_label[X[i, self.constr_id]] = self.labels_[i]
+
+  def predict(self, X):
+    check_is_fitted(self, ['labels_', 'models_'])
+    X = check_array(X)
+
+    # TODO: optimize this
+    test_labels = np.zeros(X.shape[0], np.int)
+    for i in range(X.shape[0]):
+      test_labels[i] = self.constr_to_label[X[i, self.constr_id]]
+
+    preds = np.empty(X.shape[0])
+    for cl_idx in range(self.num_planes):
+      if np.sum(test_labels == cl_idx) == 0:
+        continue
+      y_pred = self.models_[cl_idx].predict(X[test_labels == cl_idx])
+      preds[test_labels == cl_idx] = y_pred
+    return preds
+
+
 class KPlaneLabelPredictor(BaseEstimator):
   def __init__(self, num_planes):
     self.num_planes = num_planes
@@ -92,35 +136,6 @@ class CLRpRegressor(BaseEstimator):
     return preds
 
 
-class CLRpRegressorEnsemble(BaseEstimator):
-  def __init__(self, num_planes, kmeans_coef,
-               num_tries=10, clf=None, weighted=False):
-    self.num_planes = num_planes
-    self.kmeans_coef = kmeans_coef
-    self.num_tries = num_tries
-    self.weighted = weighted
-    self.clf = clf
-
-    self.rgrs = []
-    for i in range(num_tries):
-      self.rgrs.append(
-        CLRpRegressor(num_planes, kmeans_coef, 1, clf, weighted)
-      )
-
-  def fit(self, X, y, init_labels=None, max_iter=100,
-          seed=None, verbose=False):
-    if seed is not None:
-      np.random.seed(seed)
-    for i in range(len(self.rgrs)):
-      self.rgrs[i].fit(X, y, init_labels, max_iter, verbose=verbose)
-
-  def predict(self, X):
-    ans = np.zeros(X.shape[0])
-    for i in range(len(self.rgrs)):
-      ans += self.rgrs[i].predict(X)
-    return ans / len(self.rgrs)
-
-
 class KPlaneRegressor(CLRpRegressor):
   def __init__(self, num_planes, kmeans_coef, num_tries=1, weighted=False):
     super(KPlaneRegressor, self).__init__(
@@ -129,16 +144,3 @@ class KPlaneRegressor(CLRpRegressor):
       weighted,
     )
 
-
-class KPlaneRegressorEnsemble(CLRpRegressorEnsemble):
-  def __init__(self, num_planes, kmeans_coef, num_tries=10, weighted=False):
-    self.num_planes = num_planes
-    self.kmeans_coef = kmeans_coef
-    self.num_tries = num_tries
-    self.weighted = weighted
-
-    self.rgrs = []
-    for i in range(num_tries):
-      self.rgrs.append(
-        KPlaneRegressor(num_planes, kmeans_coef, 1, weighted)
-      )
