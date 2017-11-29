@@ -5,7 +5,7 @@ from sklearn.model_selection import cross_validate
 
 def label_prediction_score(model, X, y):
   try:
-    return model.label_score_.mean()
+    return model.get_label_score_()
   except:
     return np.nan
 
