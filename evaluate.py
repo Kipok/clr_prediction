@@ -11,7 +11,7 @@ def label_prediction_score(model, X, y):
 
 
 def evaluate(rgr, X, y, cv_folds=10, cv_times=10,
-             aggr_cv=False, n_jobs=1, verbose=False):
+             n_jobs=1, verbose=False):
   score_dict = {
     'r2': 'r2',
     'mse': 'neg_mean_squared_error',
@@ -21,6 +21,7 @@ def evaluate(rgr, X, y, cv_folds=10, cv_times=10,
           'test_rmse', 'train_rmse', 'fit_time', 'score_time',
           'train_label_acc', 'test_label_acc']
   scores = {key: np.array([]) for key in keys}
+  scores_aggr = {key: np.array([]) for key in keys}
   for i in range(cv_times):
     shuffle_idx = np.random.choice(X.shape[0], X.shape[0], replace=False)
     X = X[shuffle_idx]
@@ -34,8 +35,7 @@ def evaluate(rgr, X, y, cv_folds=10, cv_times=10,
         val = -cur_scores[key]
       else:
         val = cur_scores[key]
-      if aggr_cv:
-        scores[key] = np.append(scores[key], np.mean(val))
+      scores_aggr[key] = np.append(scores[key], np.mean(val))
       scores[key] = np.append(scores[key], val)
   res_scores = {}
   for key in keys:
@@ -44,6 +44,7 @@ def evaluate(rgr, X, y, cv_folds=10, cv_times=10,
         key, scores[key].mean(), scores[key].std()))
     res_scores[key + '_mean'] = scores[key].mean()
     res_scores[key + '_std'] = scores[key].std()
+    res_scores[key + '_std_aggr'] = scores_aggr[key].std()
   return res_scores
 
 
