@@ -4,11 +4,12 @@ from sklearn.base import BaseEstimator
 
 
 class BaseEnsemble(BaseEstimator):
-  def __init__(self, rgr, **kwargs):
+  def __init__(self, rgr, num_ensembles, **kwargs):
     self.__dict__.update(kwargs)
     self.rgr = rgr
+    self.num_ensembles = num_ensembles
     self.rgrs = []
-    for i in range(self.num_tries):
+    for i in range(self.num_ensembles):
       self.rgrs.append(self.rgr(**kwargs))
 
   def fit(self, X, y, init_labels=None, max_iter=100,
@@ -27,30 +28,30 @@ class BaseEnsemble(BaseEstimator):
 
 class CLRpRegressorEnsemble(BaseEnsemble):
   def __init__(self, num_planes, kmeans_coef,
-               num_tries=10, clf=None, weighted=False):
+               num_ensembles=10, clf=None, weighted=False):
     super(CLRpRegressorEnsemble, self).__init__(
-      CLRpRegressor,
+      CLRpRegressor, num_ensembles,
       num_planes=num_planes, kmeans_coef=kmeans_coef,
-      num_tries=num_tries, clf=clf, weighted=weighted
+      clf=clf, weighted=weighted
     )
 
 
 class KPlaneRegressorEnsemble(BaseEnsemble):
   def __init__(self, num_planes, kmeans_coef,
-               num_tries=10, weighted=False):
+               num_ensembles=10, weighted=False):
     super(KPlaneRegressorEnsemble, self).__init__(
-      KPlaneRegressor,
+      KPlaneRegressor, num_ensembles,
       num_planes=num_planes, kmeans_coef=kmeans_coef,
-      num_tries=num_tries, weighted=weighted,
+      weighted=weighted,
     )
 
 
 class CLRcRegressorEnsemble(BaseEnsemble):
   def __init__(self, num_planes, kmeans_coef,
-               constr, num_tries=10):
+               constr, num_ensembles=10):
     super(CLRcRegressorEnsemble, self).__init__(
-      CLRpRegressor, constr=constr,
+      CLRpRegressor, num_ensembles,
       num_planes=num_planes, kmeans_coef=kmeans_coef,
-      num_tries=num_tries, clf=clf, weighted=weighted
+      constr=constr, clf=clf, weighted=weighted
     )
 
