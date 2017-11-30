@@ -1,12 +1,13 @@
 import numpy as np
 from sklearn.metrics import r2_score, mean_squared_error as mse_score
 from sklearn.linear_model import Ridge
+from sklearn.base import clone
 
 
-def best_clr(X, y, k, kmeans_X=0.0, constr=None, max_iter=100, num_tries=10):
+def best_clr(X, y, k, num_tries=10, **kwargs):
   best_obj = 1e9
   for i in range(num_tries):
-    labels, models, obj = clr(X, y, k, kmeans_X, constr, max_iter)
+    labels, models, obj = clr(X, y, k, **kwargs)
     if obj < best_obj:
       best_obj = obj
       best_labels = labels
@@ -23,10 +24,13 @@ def reassign_labels(scores, constr):
   return labels
 
 
-def clr(X, y, k, kmeans_X=0.0, constr=None, max_iter=100, labels=None, verbose=0):
+def clr(X, y, k, kmeans_X=0.0, constr=None, lr=None,
+        max_iter=100, labels=None, verbose=0):
   if labels is None:
     labels = np.random.choice(k, size=X.shape[0])
-  models = [Ridge(alpha=1e-5) for i in range(k)]
+  if lr is None:
+    lr = Ridge(alpha=1e-5)
+  models = [clone(lr) for i in range(k)]
   scores = np.empty((X.shape[0], k))
   preds = np.empty((X.shape[0], k))
 

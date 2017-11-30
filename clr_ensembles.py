@@ -27,31 +27,31 @@ class BaseEnsemble(BaseEstimator):
 
 
 class CLRpRegressorEnsemble(BaseEnsemble):
-  def __init__(self, num_planes, kmeans_coef,
+  def __init__(self, num_planes, kmeans_coef, clr_lr=None,
                num_ensembles=10, clf=None, weighted=False):
     super(CLRpRegressorEnsemble, self).__init__(
       CLRpRegressor, num_ensembles,
       num_planes=num_planes, kmeans_coef=kmeans_coef,
-      clf=clf, weighted=weighted
+      clf=clf, weighted=weighted, clr_lr=clr_lr
     )
 
 
 class KPlaneRegressorEnsemble(BaseEnsemble):
-  def __init__(self, num_planes, kmeans_coef,
+  def __init__(self, num_planes, kmeans_coef, clr_lr=None,
                num_ensembles=10, weighted=False):
     super(KPlaneRegressorEnsemble, self).__init__(
       KPlaneRegressor, num_ensembles,
       num_planes=num_planes, kmeans_coef=kmeans_coef,
-      weighted=weighted,
+      weighted=weighted, clr_lr=clr_lr
     )
 
 
 class CLRcRegressorEnsemble(BaseEnsemble):
   def __init__(self, num_planes, kmeans_coef,
-               constr, num_ensembles=10):
+               constr_id, clr_lr=None, num_ensembles=10):
     super(CLRcRegressorEnsemble, self).__init__(
-      CLRpRegressor, num_ensembles,
+      CLRcRegressor, num_ensembles,
       num_planes=num_planes, kmeans_coef=kmeans_coef,
-      constr=constr, clf=clf, weighted=weighted
+      constr_id=constr_id, clr_lr=clr_lr
     )
 

@@ -8,11 +8,13 @@ from clr import best_clr
 
 
 class CLRcRegressor(BaseEstimator):
-  def __init__(self, num_planes, kmeans_coef, constr_id, num_tries=1):
+  def __init__(self, num_planes, kmeans_coef,
+               constr_id, num_tries=1, clr_lr=None):
     self.num_planes = num_planes
     self.kmeans_coef = kmeans_coef
     self.num_tries = num_tries
     self.constr_id = constr_id
+    self.clr_lr = clr_lr
 
   def fit(self, X, y, init_labels=None, max_iter=100,
           seed=None, verbose=False):
@@ -27,6 +29,7 @@ class CLRcRegressor(BaseEstimator):
     self.labels_, self.models_, _ = best_clr(
       X, y, k=self.num_planes, kmeans_X=self.kmeans_coef,
       constr=constr, max_iter=max_iter, num_tries=self.num_tries,
+      lr=self.clr_lr
     )
     # TODO: optimize this
     self.constr_to_label = {}
@@ -78,12 +81,14 @@ class KPlaneLabelPredictor(BaseEstimator):
 
 
 class CLRpRegressor(BaseEstimator):
-  def __init__(self, num_planes, kmeans_coef,
+  def __init__(self, num_planes, kmeans_coef, clr_lr=None,
                num_tries=1, clf=None, weighted=False):
     self.num_planes = num_planes
     self.kmeans_coef = kmeans_coef
     self.num_tries = num_tries
     self.weighted = weighted
+    self.clr_lr = clr_lr
+
     if clf is None:
       # TODO: this is slooooow
       self.clf = RandomForestClassifier(
@@ -100,6 +105,7 @@ class CLRpRegressor(BaseEstimator):
     self.labels_, self.models_, _ = best_clr(
       X, y, k=self.num_planes, kmeans_X=self.kmeans_coef,
       max_iter=max_iter, num_tries=self.num_tries,
+      lr=self.clr_lr,
     )
     self.X_ = X
     if verbose:
@@ -137,10 +143,12 @@ class CLRpRegressor(BaseEstimator):
 
 
 class KPlaneRegressor(CLRpRegressor):
-  def __init__(self, num_planes, kmeans_coef, num_tries=1, weighted=False):
+  def __init__(self, num_planes, kmeans_coef,
+               num_tries=1, weighted=False, clr_lr=None):
     super(KPlaneRegressor, self).__init__(
-      num_planes, kmeans_coef, num_tries,
-      KPlaneLabelPredictor(num_planes),
-      weighted,
+      num_planes, kmeans_coef,
+      num_tries=num_tries,
+      clr=KPlaneLabelPredictor(num_planes),
+      weighted=weighted, clr_lr=clr_lr,
     )
 
