@@ -35,7 +35,7 @@ def evaluate(rgr, X, y, cv_folds=10, cv_times=10,
         val = -cur_scores[key]
       else:
         val = cur_scores[key]
-      scores_aggr[key] = np.append(scores[key], np.mean(val))
+      scores_aggr[key] = np.append(scores_aggr[key], np.mean(val))
       scores[key] = np.append(scores[key], val)
   res_scores = {}
   for key in keys:
