@@ -130,7 +130,7 @@ class CLRpRegressor(BaseEstimator):
         planes_probs[:, self.clf.classes_] = self.clf.predict_proba(X)
       preds = np.empty((X.shape[0], self.num_planes))
       for cl_idx in range(self.num_planes):
-        preds[:,cl_idx] = self.models_[cl_idx].predict(X)
+        preds[:, cl_idx] = self.models_[cl_idx].predict(X)
       preds = np.sum(preds * planes_probs, axis=1)
     else:
       test_labels = self.clf.predict(X)

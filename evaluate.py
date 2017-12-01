@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import cross_validate
+import time
 
 
 def label_prediction_score(model, X, y):
@@ -10,7 +11,7 @@ def label_prediction_score(model, X, y):
     return np.nan
 
 
-def evaluate(rgr, X, y, cv_folds=10, cv_times=10,
+def evaluate(rgr, X, y, cv_folds=10, cv_times=5,
              n_jobs=1, verbose=False):
   score_dict = {
     'r2': 'r2',
@@ -51,8 +52,11 @@ def evaluate(rgr, X, y, cv_folds=10, cv_times=10,
 def evaluate_all(run_params):
   results = None
   for name, pm in run_params.items():
-    print('Processing: {}'.format(name))
+    print('Processing: {}'.format(name), end="\r", flush=True)
+    tm = time.time()
     res_scores = evaluate(*pm)
+    print('Processing: {} [mse = {:.6f}, time = {:.2f}s]'.format(
+      name, res_scores['test_mse_mean'], time.time() - tm), flush=True)
     if results is None:
       results = pd.DataFrame(columns=res_scores.keys())
     results = results.append(pd.Series(res_scores, name=name))

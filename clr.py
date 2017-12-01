@@ -16,8 +16,9 @@ def reassign_labels(scores, constr):
 def fuzzy_clr(X, y, k, kmeans_X=0.0,
               max_iter=1000, verbose=0, lr=None):
   if lr is None:
-    lr = LinearRegression(fit_intercept=False)
-    X = np.hstack((X, np.ones((X.shape[0], 1))))
+#    lr = LinearRegression(fit_intercept=False)
+#    X = np.hstack((X, np.ones((X.shape[0], 1))))
+    lr = Ridge(alpha=1e-5)
   models = [clone(lr) for i in range(k)]
   q = np.random.rand(X.shape[0], k)
   q /= np.sum(q, axis=1, keepdims=True)
@@ -64,6 +65,11 @@ def fuzzy_clr(X, y, k, kmeans_X=0.0,
   if verbose == 1:
       print("Iter #{}: loglike = {:.6f}".format(it, loglike))
   labels = np.argmax(q, axis=1)
+  for cl_idx in range(k):
+      if np.sum(labels == cl_idx) == 0:
+        continue
+      models[cl_idx].fit(X[labels == cl_idx], y[labels == cl_idx])
+
   return labels, models, loglike
 
 
