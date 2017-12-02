@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import sys
+import argparse
 
 from sklearn.datasets import load_boston
 
@@ -23,19 +25,38 @@ def preprocess_data(X, y):
 
 
 if __name__ == '__main__':
-  boston = load_boston()
+  parser = argparse.ArgumentParser(description='Search parameters')
+  parser.add_argument('--dataset', required=True)
+  parser.add_argument('--seed', default=0, type=int)
+  args = parser.parse_args()
   np.random.seed(0)
 
-  X, y = preprocess_data(boston.data, boston.target)
+  if args.dataset == 'boston':
+    boston = load_boston()
+    X = boston.data
+    y = boston.target
+    constr_id = 8
+  elif args.dataset == 'abalone':
+    abalone_data = pd.read_csv('data/abalone.data', header=None)
+    with open('data/abalone.names', 'r') as fin:
+      abalone_descr = fin.read()
+    X = pd.get_dummies(abalone_data.iloc[:,:-1], columns=[0]).as_matrix().astype(np.float)
+    X = np.hstack((X, (np.digitize(X[:, 2], np.linspace(0, 0.3, 10)))[:,np.newaxis]))
+    y = abalone_data.iloc[:, 8].as_matrix().astype(np.float)
+    constr_id = 10
+  else:
+    print("Dataset is not supported")
+    sys.exit(0)
+  X, y = preprocess_data(X, y)
 
   params = {
     'lr': [Ridge(alpha=1e-5), X, y],
     'ridge 10.0': [Ridge(alpha=10.0), X, y],
   }
 
-  for C in [0.1, 1.0, 10.0, 100.0, 128.0]:
-    for g in ['auto', 0.25]:
-      for eps in [2 ** (-8), 0.001, 0.1]:
+  for C in [0.1, 1.0, 10.0, 32.0, 100.0, 128.0]:
+    for g in ['auto', 0.25, 0.5]:
+      for eps in [2 ** (-8), 0.001, 0.1, 0.5]:
         params['svr C={}, g={}, eps={}'.format(C, g, eps)] = [SVR(C=C, gamma=g, epsilon=eps), X, y]
 
   for max_depth in [None, 10, 50]:
@@ -51,7 +72,6 @@ if __name__ == '__main__':
             min_samples_split=min_samples_split,
             min_samples_leaf=min_samples_leaf), X, y]
 
-  # for lr in [None, Ridge(0.1), Ridge(1.0), Ridge(10.0), Lasso(0.1), Lasso(1.0), Lasso(10.0)]
   for f in [True, False]:
     for w in [True, False]:
       for k in [2, 4, 6, 8]:
@@ -67,7 +87,8 @@ if __name__ == '__main__':
 
   for k in [2, 4, 6, 8]:
     for l in [0, 1, 10, 100]:
-      params['CLS_c k={} l={}'.format(k, l)] = [CLRcRegressor(k, l, constr_id=8), X, y]
-      params['CLS_c k={} l={} ens=10'.format(k, l)] = [CLRcRegressorEnsemble(k, l, constr_id=8), X, y]
+      params['CLS_c k={} l={}'.format(k, l)] = [CLRcRegressor(k, l, constr_id=constr_id), X, y]
+      params['CLS_c k={} l={} ens=10'.format(k, l)] = [CLRcRegressorEnsemble(k, l, constr_id=constr_id), X, y]
 
-  evaluate_all(params)
+  evaluate_all(params, file_name="results/{}.csv".format(args.dataset))
+
