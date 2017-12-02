@@ -41,9 +41,15 @@ if __name__ == '__main__':
     with open('data/abalone.names', 'r') as fin:
       abalone_descr = fin.read()
     X = pd.get_dummies(abalone_data.iloc[:,:-1], columns=[0]).as_matrix().astype(np.float)
-    X = np.hstack((X, (np.digitize(X[:, 2], np.linspace(0, 0.3, 10)))[:,np.newaxis]))
+    X = np.hstack((X, (np.digitize(X[:, 2], np.linspace(0.1, 0.2, 10)))[:,np.newaxis]))
     y = abalone_data.iloc[:, 8].as_matrix().astype(np.float)
     constr_id = 10
+  elif args.dataset == 'auto-mpg':
+    data = pd.read_csv('data/auto-mpg.data', header=None, sep='\s+', na_values='?')
+    data = data.dropna()
+    X = pd.get_dummies(data.iloc[:,1:-1], columns=[7]).as_matrix().astype(np.float)
+    y = data[0].as_matrix().astype(np.float)
+    constr_id = 5
   else:
     print("Dataset is not supported")
     sys.exit(0)
@@ -54,9 +60,9 @@ if __name__ == '__main__':
     'ridge 10.0': [Ridge(alpha=10.0), X, y],
   }
 
-  for C in [0.1, 1.0, 10.0, 32.0, 100.0, 128.0]:
-    for g in ['auto', 0.25, 0.5]:
-      for eps in [2 ** (-8), 0.001, 0.1, 0.5]:
+  for C in [0.1, 1.0, 16.0, 32.0, 100.0, 128.0]:
+    for g in ['auto', 0.25, 0.5, 1.0]:
+      for eps in [2 ** (-8), 0.01, 0.25, 0.5]:
         params['svr C={}, g={}, eps={}'.format(C, g, eps)] = [SVR(C=C, gamma=g, epsilon=eps), X, y]
 
   for max_depth in [None, 10, 50]:
