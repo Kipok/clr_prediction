@@ -12,7 +12,7 @@ def label_prediction_score(model, X, y):
 
 
 def evaluate(rgr, X, y, cv_folds=10, cv_times=5,
-             n_jobs=1, verbose=False):
+             n_jobs=-1, verbose=False):
   score_dict = {
     'r2': 'r2',
     'mse': 'neg_mean_squared_error',

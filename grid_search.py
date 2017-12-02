@@ -63,7 +63,9 @@ if __name__ == '__main__':
   for C in [0.1, 1.0, 16.0, 32.0, 100.0, 128.0]:
     for g in ['auto', 0.25, 0.5, 1.0]:
       for eps in [2 ** (-8), 0.01, 0.25, 0.5]:
-        params['svr C={}, g={}, eps={}'.format(C, g, eps)] = [SVR(C=C, gamma=g, epsilon=eps), X, y]
+        params['svr C={}, g={}, eps={}'.format(C, g, eps)] = [
+          SVR(C=C, gamma=g, epsilon=eps), X, y
+        ]
 
   for max_depth in [None, 10, 50]:
     for max_features in ['auto', 5]:
@@ -76,7 +78,7 @@ if __name__ == '__main__':
             n_estimators=100, max_depth=max_depth,
             max_features=max_features,
             min_samples_split=min_samples_split,
-            min_samples_leaf=min_samples_leaf), X, y]
+            min_samples_leaf=min_samples_leaf, n_jobs=-1), X, y]
 
   for f in [True, False]:
     for w in [True, False]:
