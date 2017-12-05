@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import cross_validate
 import time
+from multiprocessing import Pool
 
 
 def label_prediction_score(model, X, y):
@@ -12,7 +13,7 @@ def label_prediction_score(model, X, y):
 
 
 def evaluate(rgr, X, y, cv_folds=10, cv_times=5,
-             n_jobs=-1, verbose=False):
+             n_jobs=1, verbose=False):
   score_dict = {
     'r2': 'r2',
     'mse': 'neg_mean_squared_error',
@@ -49,14 +50,38 @@ def evaluate(rgr, X, y, cv_folds=10, cv_times=5,
   return res_scores
 
 
-def evaluate_all(run_params, file_name='results.csv'):
+def evaluate_all(run_params, file_name='results.csv', n_jobs=1):
+  if n_jobs == 1:
+    return evaluate_seq(run_params, file_name)
+  else:
+    return evaluate_par(run_params, file_name, n_jobs)
+
+
+def lambda_eval(pm):
+  return evaluate(*pm)
+
+
+def evaluate_par(run_params, file_name='results.csv', n_jobs=4):
+  results = None
+  with Pool(n_jobs) as p:
+    res_scores = p.map(lambda_eval, run_params.values())
+
+  for name, res_score in zip(run_params.keys(), res_scores):
+    if results is None:
+      results = pd.DataFrame(columns=res_score.keys())
+    results = results.append(pd.Series(res_score, name=name))
+  results.to_csv(file_name)
+  return results
+
+
+def evaluate_seq(run_params, file_name='results.csv'):
   results = None
   total = len(run_params)
   for i, (name, pm) in enumerate(run_params.items()):
     print('Processing {}/{}: {}'.format(i, total, name), end="\r", flush=True)
     tm = time.time()
-    res_scores = evaluate(*pm)
-    print('Processing {}/{}: {} [mse = {:.6f}, time = {:.2f}s]'.format(
+    res_scores = evaluate(*pm, n_jobs=-1)
+    print('Processed {}/{}: {} [mse = {:.6f}, time = {:.2f}s]'.format(
       i, total, name, res_scores['test_mse_mean'], time.time() - tm), flush=True)
     if results is None:
       results = pd.DataFrame(columns=res_scores.keys())

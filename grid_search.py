@@ -29,6 +29,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Search parameters')
   parser.add_argument('--dataset', required=True)
   parser.add_argument('--seed', default=0, type=int)
+  parser.add_argument('--njobs', default=1, type=int)
   args = parser.parse_args()
   np.random.seed(0)
 
@@ -61,30 +62,30 @@ if __name__ == '__main__':
     'ridge 10.0': [Ridge(alpha=10.0), X, y],
   }
 
-#  for C in [0.1, 1.0, 16.0, 32.0, 100.0, 128.0]:
-#    for g in ['auto', 0.25, 0.5, 1.0]:
-#      for eps in [2 ** (-8), 0.01, 0.25, 0.5]:
-#        params['svr C={}, g={}, eps={}'.format(C, g, eps)] = [
-#          SVR(C=C, gamma=g, epsilon=eps), X, y
-#        ]
-#
-#  for max_depth in [None, 10, 50]:
-#    for max_features in ['auto', 5]:
-#      for min_samples_split in [2, 10, 30]:
-#        for min_samples_leaf in [1, 10, 30]:
-#          params[
-#            'rf md={}, mf={}, mss={}, msl={}'.format(
-#              max_depth,max_features, min_samples_split, min_samples_leaf)
-#          ] = [RandomForestRegressor(
-#            n_estimators=100, max_depth=max_depth,
-#            max_features=max_features,
-#            min_samples_split=min_samples_split,
-#            min_samples_leaf=min_samples_leaf, n_jobs=-1), X, y]
+  for C in [0.1, 1.0, 16.0, 32.0, 100.0, 128.0]:
+    for g in ['auto', 0.25, 0.5, 1.0]:
+      for eps in [2 ** (-8), 0.01, 0.25, 0.5]:
+        params['svr C={}, g={}, eps={}'.format(C, g, eps)] = [
+          SVR(C=C, gamma=g, epsilon=eps), X, y
+        ]
 
-  for f in [True]:
-    for w in [True]:
-      for k in [2, 4]:
-        for l in [0]:
+  for max_depth in [None, 10, 50]:
+    for max_features in ['auto', 5]:
+      for min_samples_split in [2, 10, 30]:
+        for min_samples_leaf in [1, 10, 30]:
+          params[
+            'rf md={}, mf={}, mss={}, msl={}'.format(
+              max_depth,max_features, min_samples_split, min_samples_leaf)
+          ] = [RandomForestRegressor(
+            n_estimators=100, max_depth=max_depth,
+            max_features=max_features,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf), X, y]
+
+  for f in [True, False]:
+    for w in [True, False]:
+      for k in [2, 4, 6, 8]:
+        for l in [0, 1, 10, 100]:
           params['kplane k={} l={} w={} f={}'.format(k, l, w, f)] = [
             KPlaneRegressor(k, l, weighted=w, fuzzy=f), X, y]
           params['CLR_p k={} l={} w={} f={}'.format(k, l, w, f)] = [
@@ -94,8 +95,8 @@ if __name__ == '__main__':
           params['CLR_p k={} l={} w={} f={} ens=10'.format(k, l, w, f)] = [
             CLRpRegressorEnsemble(k, l, weighted=w, fuzzy=f), X, y]
 
-  for k in [2]:
-    for l in [0]:
+  for k in [2, 4, 6, 8]:
+    for l in [0, 1, 10, 100]:
       params['CLR_c k={} l={}'.format(k, l)] = [
         CLRcRegressor(k, l, constr_id=constr_id), X, y]
       params['CLR_c k={} l={} ens=10'.format(k, l)] = [
@@ -105,7 +106,11 @@ if __name__ == '__main__':
       params['kplane k={} l={} w=size ens=10'.format(k, l)] = [
         KPlaneRegressorEnsemble(k, l, weighted='size'), X, y]
 
-  results = evaluate_all(params, file_name="results/{}-tmp1.csv".format(args.dataset))
+  results = evaluate_all(
+    params,
+    file_name="results/{}-tmp1.csv".format(args.dataset),
+    n_jobs=args.njobs
+  )
 
   results = results.sort_values('test_mse_mean')
   add_params = {}
@@ -139,7 +144,11 @@ if __name__ == '__main__':
           CLRcRegressorEnsemble(k, l, constr_id=constr_id, clr_lr=Ridge(alpha)), X, y
         ]
       break
-  add_results = evaluate_all(add_params, file_name="results/{}-tmp2.csv".format(args.dataset))
+  add_results = evaluate_all(
+    add_params,
+    file_name="results/{}-tmp2.csv".format(args.dataset),
+    n_jobs=args.njobs
+  )
 
   res_complete = results.append(add_results)
   res_complete.to_csv("results/{}.csv".format(args.dataset))
