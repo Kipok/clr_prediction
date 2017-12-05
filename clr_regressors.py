@@ -55,24 +55,36 @@ class CLRcRegressor(BaseEstimator):
 
 
 class KPlaneLabelPredictor(BaseEstimator):
-  def __init__(self, num_planes):
+  def __init__(self, num_planes, weight_mode='kplane'):
     self.num_planes = num_planes
     self.n_classes_ = num_planes
+    self.weight_mode = weight_mode
 
   def fit(self, X, y):
-    self.centers_ = np.empty((self.num_planes, X.shape[1]))
-    for cl in range(self.num_planes):
-      if np.sum(y == cl) == 0:
-        # filling with inf empty clusters
-        self.centers_[cl] = np.ones(X.shape[1]) * 1e5
-        continue
-      self.centers_[cl] = np.mean(X[y == cl], axis=0)
+    if self.weight_mode == 'size':
+      self.weights = np.empty(self.num_planes)
+      for cl in range(self.num_planes):
+        self.weights[cl] = np.sum(y == cl)
+      self.weights /= np.sum(self.weights)
+    else:
+      self.centers_ = np.empty((self.num_planes, X.shape[1]))
+      for cl in range(self.num_planes):
+        if np.sum(y == cl) == 0:
+          # filling with inf empty clusters
+          self.centers_[cl] = np.ones(X.shape[1]) * 1e5
+          continue
+        self.centers_[cl] = np.mean(X[y == cl], axis=0)
 
   def predict(self, X):
+    if self.weight_mode == 'size':
+      probs = self.predict_proba
+      return np.argmax(probs)
     dst = cdist(self.centers_, X)
     return np.argmin(dst, axis=0)
 
   def predict_proba(self, X):
+    if self.weight_mode == 'size':
+      return self.weights
     dst = cdist(self.centers_, X)
     return dst.T / np.sum(dst.T, axis=1, keepdims=True)
 
@@ -146,10 +158,11 @@ class CLRpRegressor(BaseEstimator):
 class KPlaneRegressor(CLRpRegressor):
   def __init__(self, num_planes, kmeans_coef, fuzzy=False,
                num_tries=1, weighted=False, clr_lr=None):
+    weighted_param = True if weighted == 'size' else weighted
     super(KPlaneRegressor, self).__init__(
       num_planes, kmeans_coef,
       num_tries=num_tries, fuzzy=fuzzy,
-      clf=KPlaneLabelPredictor(num_planes),
-      weighted=weighted, clr_lr=clr_lr,
+      clf=KPlaneLabelPredictor(num_planes, weight_mode=weighted),
+      weighted=weighted_param, clr_lr=clr_lr,
     )
 

@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import sys
 import argparse
+import os
 
 from sklearn.datasets import load_boston
 
@@ -60,43 +61,88 @@ if __name__ == '__main__':
     'ridge 10.0': [Ridge(alpha=10.0), X, y],
   }
 
-  for C in [0.1, 1.0, 16.0, 32.0, 100.0, 128.0]:
-    for g in ['auto', 0.25, 0.5, 1.0]:
-      for eps in [2 ** (-8), 0.01, 0.25, 0.5]:
-        params['svr C={}, g={}, eps={}'.format(C, g, eps)] = [
-          SVR(C=C, gamma=g, epsilon=eps), X, y
-        ]
+#  for C in [0.1, 1.0, 16.0, 32.0, 100.0, 128.0]:
+#    for g in ['auto', 0.25, 0.5, 1.0]:
+#      for eps in [2 ** (-8), 0.01, 0.25, 0.5]:
+#        params['svr C={}, g={}, eps={}'.format(C, g, eps)] = [
+#          SVR(C=C, gamma=g, epsilon=eps), X, y
+#        ]
+#
+#  for max_depth in [None, 10, 50]:
+#    for max_features in ['auto', 5]:
+#      for min_samples_split in [2, 10, 30]:
+#        for min_samples_leaf in [1, 10, 30]:
+#          params[
+#            'rf md={}, mf={}, mss={}, msl={}'.format(
+#              max_depth,max_features, min_samples_split, min_samples_leaf)
+#          ] = [RandomForestRegressor(
+#            n_estimators=100, max_depth=max_depth,
+#            max_features=max_features,
+#            min_samples_split=min_samples_split,
+#            min_samples_leaf=min_samples_leaf, n_jobs=-1), X, y]
 
-  for max_depth in [None, 10, 50]:
-    for max_features in ['auto', 5]:
-      for min_samples_split in [2, 10, 30]:
-        for min_samples_leaf in [1, 10, 30]:
-          params[
-            'rf md={}, mf={}, mss={}, msl={}'.format(
-              max_depth,max_features, min_samples_split, min_samples_leaf)
-          ] = [RandomForestRegressor(
-            n_estimators=100, max_depth=max_depth,
-            max_features=max_features,
-            min_samples_split=min_samples_split,
-            min_samples_leaf=min_samples_leaf, n_jobs=-1), X, y]
-
-  for f in [True, False]:
-    for w in [True, False]:
-      for k in [2, 4, 6, 8]:
-        for l in [0, 1, 10, 100]:
+  for f in [True]:
+    for w in [True]:
+      for k in [2, 4]:
+        for l in [0]:
           params['kplane k={} l={} w={} f={}'.format(k, l, w, f)] = [
             KPlaneRegressor(k, l, weighted=w, fuzzy=f), X, y]
-          params['CLS_p k={} l={} w={} f={}'.format(k, l, w, f)] = [
+          params['CLR_p k={} l={} w={} f={}'.format(k, l, w, f)] = [
             CLRpRegressor(k, l, weighted=w, fuzzy=f), X, y]
           params['kplane k={} l={} w={} f={} ens=10'.format(k, l, w, f)] = [
             KPlaneRegressorEnsemble(k, l, weighted=w, fuzzy=f), X, y]
-          params['CLS_p k={} l={} w={} f={} ens=10'.format(k, l, w, f)] = [
+          params['CLR_p k={} l={} w={} f={} ens=10'.format(k, l, w, f)] = [
             CLRpRegressorEnsemble(k, l, weighted=w, fuzzy=f), X, y]
 
-  for k in [2, 4, 6, 8]:
-    for l in [0, 1, 10, 100]:
-      params['CLS_c k={} l={}'.format(k, l)] = [CLRcRegressor(k, l, constr_id=constr_id), X, y]
-      params['CLS_c k={} l={} ens=10'.format(k, l)] = [CLRcRegressorEnsemble(k, l, constr_id=constr_id), X, y]
+  for k in [2]:
+    for l in [0]:
+      params['CLR_c k={} l={}'.format(k, l)] = [
+        CLRcRegressor(k, l, constr_id=constr_id), X, y]
+      params['CLR_c k={} l={} ens=10'.format(k, l)] = [
+        CLRcRegressorEnsemble(k, l, constr_id=constr_id), X, y]
+      params['kplane k={} l={} w=size'.format(k, l)] = [
+        KPlaneRegressor(k, l, weighted='size'), X, y]
+      params['kplane k={} l={} w=size ens=10'.format(k, l)] = [
+        KPlaneRegressorEnsemble(k, l, weighted='size'), X, y]
 
-  evaluate_all(params, file_name="results/{}.csv".format(args.dataset))
+  results = evaluate_all(params, file_name="results/{}-tmp1.csv".format(args.dataset))
+
+  results = results.sort_values('test_mse_mean')
+  add_params = {}
+  # assuming ensembles are always best
+  algos = [CLRpRegressorEnsemble, KPlaneRegressorEnsemble]
+  algo_names = ['CLR_p', 'kplane']
+  for algo, algo_name in zip(algos, algo_names):
+    for idx in results.index:
+      if algo_name in idx:
+        k = int(idx.split()[1].split('=')[1])
+        l = int(idx.split()[2].split('=')[1])
+        w = idx.split()[3].split('=')[1] == 'True'
+        f = idx.split()[4].split('=')[1] == 'True'
+        for alpha in [0.01, 0.1, 1.0, 10.0, 100.0]:
+          add_params[idx + ' Lasso {}'.format(alpha)] = [
+            algo(k, l, weighted=w, fuzzy=f, clr_lr=Lasso(alpha)), X, y
+          ]
+          add_params[idx + ' Ridge {}'.format(alpha)] = [
+            algo(k, l, weighted=w, fuzzy=f, clr_lr=Ridge(alpha)), X, y
+          ]
+        break
+  for idx in results.index:
+    if 'CLR_c' in idx:
+      k = int(idx.split()[1].split('=')[1])
+      l = int(idx.split()[2].split('=')[1])
+      for alpha in [0.01, 0.1, 1.0, 10.0, 100.0]:
+        add_params[idx + ' Lasso {}'.format(alpha)] = [
+          CLRcRegressorEnsemble(k, l, constr_id=constr_id, clr_lr=Lasso(alpha)), X, y
+        ]
+        add_params[idx + ' Ridge {}'.format(alpha)] = [
+          CLRcRegressorEnsemble(k, l, constr_id=constr_id, clr_lr=Ridge(alpha)), X, y
+        ]
+      break
+  add_results = evaluate_all(add_params, file_name="results/{}-tmp2.csv".format(args.dataset))
+
+  res_complete = results.append(add_results)
+  res_complete.to_csv("results/{}.csv".format(args.dataset))
+  os.remove("results/{}-tmp1.csv".format(args.dataset))
+  os.remove("results/{}-tmp2.csv".format(args.dataset))
 

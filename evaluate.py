@@ -51,12 +51,13 @@ def evaluate(rgr, X, y, cv_folds=10, cv_times=5,
 
 def evaluate_all(run_params, file_name='results.csv'):
   results = None
-  for name, pm in run_params.items():
-    print('Processing: {}'.format(name), end="\r", flush=True)
+  total = len(run_params)
+  for i, (name, pm) in enumerate(run_params.items()):
+    print('Processing {}/{}: {}'.format(i, total, name), end="\r", flush=True)
     tm = time.time()
     res_scores = evaluate(*pm)
-    print('Processing: {} [mse = {:.6f}, time = {:.2f}s]'.format(
-      name, res_scores['test_mse_mean'], time.time() - tm), flush=True)
+    print('Processing {}/{}: {} [mse = {:.6f}, time = {:.2f}s]'.format(
+      i, total, name, res_scores['test_mse_mean'], time.time() - tm), flush=True)
     if results is None:
       results = pd.DataFrame(columns=res_scores.keys())
     results = results.append(pd.Series(res_scores, name=name))
