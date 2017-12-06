@@ -1,3 +1,6 @@
+from __future__ import print_function
+from builtins import range
+
 import numpy as np
 from clr_regressors import CLRpRegressor, CLRcRegressor, KPlaneRegressor
 from sklearn.base import BaseEstimator

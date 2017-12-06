@@ -1,3 +1,6 @@
+from __future__ import print_function
+from builtins import range
+
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import cross_validate
@@ -12,7 +15,7 @@ def label_prediction_score(model, X, y):
     return np.nan
 
 
-def evaluate(rgr, X, y, cv_folds=10, cv_times=5,
+def evaluate(rgr, X, y, cv_folds=10, cv_times=10,
              n_jobs=1, verbose=False):
   score_dict = {
     'r2': 'r2',
@@ -63,8 +66,9 @@ def lambda_eval(pm):
 
 def evaluate_par(run_params, file_name='results.csv', n_jobs=4):
   results = None
-  with Pool(n_jobs) as p:
-    res_scores = p.map(lambda_eval, run_params.values())
+  p = Pool(n_jobs)
+  res_scores = p.map(lambda_eval, run_params.values())
+  p.terminate()
 
   for name, res_score in zip(run_params.keys(), res_scores):
     if results is None:

@@ -1,3 +1,6 @@
+from __future__ import print_function
+from builtins import range
+
 import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted

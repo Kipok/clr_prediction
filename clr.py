@@ -1,3 +1,6 @@
+from __future__ import print_function
+from builtins import range
+
 import numpy as np
 from sklearn.metrics import r2_score, mean_squared_error as mse_score
 from sklearn.linear_model import Ridge, LinearRegression
