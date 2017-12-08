@@ -15,7 +15,7 @@ def label_prediction_score(model, X, y):
     return np.nan
 
 
-def evaluate(rgr, X, y, cv_folds=10, cv_times=10,
+def evaluate(rgr, X, y, cv_folds=10, cv_times=5,
              n_jobs=1, verbose=False):
   score_dict = {
     'r2': 'r2',

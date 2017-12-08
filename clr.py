@@ -17,7 +17,7 @@ def reassign_labels(scores, constr):
 
 
 def fuzzy_clr(X, y, k, kmeans_X=0.0,
-              max_iter=1000, verbose=0, lr=None):
+              max_iter=100, verbose=0, lr=None):
   if lr is None:
     lr = Ridge(alpha=1e-5)
   models = [clone(lr) for i in range(k)]
@@ -71,7 +71,7 @@ def fuzzy_clr(X, y, k, kmeans_X=0.0,
 
 
 def clr(X, y, k, kmeans_X=0.0, constr=None, lr=None,
-        max_iter=1000, labels=None, verbose=0):
+        max_iter=100, labels=None, verbose=0):
   if labels is None:
     labels = np.random.choice(k, size=X.shape[0])
   if lr is None:
