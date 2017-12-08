@@ -53,9 +53,9 @@ def evaluate(rgr, X, y, cv_folds=10, cv_times=10,
   return res_scores
 
 
-def evaluate_all(run_params, file_name='results.csv', n_jobs=1):
-  if n_jobs == 1:
-    return evaluate_seq(run_params, file_name)
+def evaluate_all(run_params, file_name='results.csv', n_jobs=1, gl_parallel=False):
+  if not gl_parallel:
+    return evaluate_seq(run_params, file_name, n_jobs)
   else:
     return evaluate_par(run_params, file_name, n_jobs)
 
@@ -78,13 +78,13 @@ def evaluate_par(run_params, file_name='results.csv', n_jobs=4):
   return results
 
 
-def evaluate_seq(run_params, file_name='results.csv'):
+def evaluate_seq(run_params, file_name='results.csv', n_jobs=4):
   results = None
   total = len(run_params)
   for i, (name, pm) in enumerate(run_params.items()):
     print('Processing {}/{}: {}'.format(i, total, name), end="\r", flush=True)
     tm = time.time()
-    res_scores = evaluate(*pm, n_jobs=-1)
+    res_scores = evaluate(*pm, n_jobs=n_jobs)
     print('Processed {}/{}: {} [mse = {:.6f}, time = {:.2f}s]'.format(
       i, total, name, res_scores['test_mse_mean'], time.time() - tm), flush=True)
     if results is None:

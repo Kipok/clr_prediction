@@ -19,8 +19,6 @@ def reassign_labels(scores, constr):
 def fuzzy_clr(X, y, k, kmeans_X=0.0,
               max_iter=1000, verbose=0, lr=None):
   if lr is None:
-#    lr = LinearRegression(fit_intercept=False)
-#    X = np.hstack((X, np.ones((X.shape[0], 1))))
     lr = Ridge(alpha=1e-5)
   models = [clone(lr) for i in range(k)]
   q = np.random.rand(X.shape[0], k)
@@ -54,10 +52,6 @@ def fuzzy_clr(X, y, k, kmeans_X=0.0,
       q[:, cl_idx] = lmbda[cl_idx] * probs[:, cl_idx]
     q /= q.sum(axis=1, keepdims=True)
 
-#    assert(np.allclose(np.sum(q, axis=1), 1.0))
-#    assert(np.all(sigma_sq > 0))
-#    assert(np.allclose(np.sum(lmbda), 1.0))
-
     if verbose > 1:
       loglike = -np.sum(np.log(np.sum(lmbda * probs, axis=1)))
       print("Iter #{}: loglike = {:.6f}".format(it, loglike))
@@ -73,7 +67,7 @@ def fuzzy_clr(X, y, k, kmeans_X=0.0,
         continue
       models[cl_idx].fit(X[labels == cl_idx], y[labels == cl_idx])
 
-  return labels, models, loglike
+  return labels, models, lmbda, loglike
 
 
 def clr(X, y, k, kmeans_X=0.0, constr=None, lr=None,
@@ -96,10 +90,8 @@ def clr(X, y, k, kmeans_X=0.0, constr=None, lr=None,
     for cl_idx in range(k):
       preds[:, cl_idx] = models[cl_idx].predict(X)
       scores[:, cl_idx] = (y - preds[:, cl_idx]) ** 2
+      # TODO: do something when cluster vanishes?
       if np.sum(labels == cl_idx) == 0:
-        if verbose > 0:
-          print("Cluster vanished! Assigning random point")
-#        labels[np.random.choice(X.shape[0])] = cl_idx
         continue
       if kmeans_X > 0:
         center = np.mean(X[labels == cl_idx], axis=0)
@@ -120,17 +112,20 @@ def clr(X, y, k, kmeans_X=0.0, constr=None, lr=None,
     print("Iter #{}: obj = {:.6f}, MSE = {:.6f}, r2 = {:.6f}".format(
           it, obj, mse_score(y, corr_preds), r2_score(y, corr_preds),
     ))
-  return labels, models, obj
+  weights = (labels == np.arange(k)[:,np.newaxis]).sum(axis=1).astype(np.float)
+  weights /= np.sum(weights)
+  return labels, models, weights, obj
 
 
 def best_clr(X, y, k, fuzzy=False, num_tries=10, **kwargs):
   clr_func = fuzzy_clr if fuzzy else clr
   best_obj = 1e9
   for i in range(num_tries):
-    labels, models, obj = clr_func(X, y, k, **kwargs)
+    labels, models, weights, obj = clr_func(X, y, k, **kwargs)
     if obj < best_obj:
       best_obj = obj
       best_labels = labels
       best_models = models
-  return best_labels, best_models, best_obj
+      best_weights = weights
+  return best_labels, best_models, best_weights, best_obj
 

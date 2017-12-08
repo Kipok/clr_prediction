@@ -20,8 +20,8 @@ def visualize_results(name, best_only=False):
   results = res[sort_columns]
   results = results.sort_values('test_mse_mean')
   if best_only:
-    algos1 = ['CLS_p', 'CLS_c', 'kplane']
-    algos2 = ['Lasso', 'Ridge', 'rf', 'lr', 'svr']
+    algos1 = ['CLR_p', 'CLR_c', 'kplane']
+    algos2 = ['rf', 'lr', 'svr']
     selected_index = []
     for algo_name in algos2:
       for idx in results.index:

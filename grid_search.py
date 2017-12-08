@@ -13,8 +13,7 @@ from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.svm import SVR
 from sklearn.ensemble import RandomForestRegressor
 
-from clr_regressors import KPlaneRegressor, CLRpRegressor, CLRcRegressor
-from clr_ensembles import KPlaneRegressorEnsemble, CLRpRegressorEnsemble, CLRcRegressorEnsemble
+from clr_regressors import KPlaneRegressor, CLRpRegressor, CLRcRegressor, RegressorEnsemble
 from evaluate import evaluate_all
 
 
@@ -32,7 +31,8 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Search parameters')
   parser.add_argument('--dataset', required=True)
   parser.add_argument('--seed', default=0, type=int)
-  parser.add_argument('--njobs', default=1, type=int)
+  parser.add_argument('--n_jobs', default=1, type=int)
+  parser.add_argument('--global_parallel', dest='global_parallel', action='store_true')
   args = parser.parse_args()
   np.random.seed(0)
 
@@ -71,7 +71,7 @@ if __name__ == '__main__':
         params['svr C={}, g={}, eps={}'.format(C, g, eps)] = [
           SVR(C=C, gamma=g, epsilon=eps), X, y
         ]
-
+  n_jobs = 1 if args.global_parallel else args.n_jobs
   for max_depth in [None, 10, 50]:
     for max_features in ['auto', 5]:
       for min_samples_split in [2, 10, 30]:
@@ -83,8 +83,9 @@ if __name__ == '__main__':
             n_estimators=100, max_depth=max_depth,
             max_features=max_features,
             min_samples_split=min_samples_split,
-            min_samples_leaf=min_samples_leaf), X, y]
+            min_samples_leaf=min_samples_leaf,n_jobs=n_jobs), X, y]
 
+  # TODO: don't refit the model for weighted/not weighted evaluation
   for f in [True, False]:
     for w in [True, False]:
       for k in [2, 4, 6, 8]:
@@ -94,31 +95,32 @@ if __name__ == '__main__':
           params['CLR_p k={} l={} w={} f={}'.format(k, l, w, f)] = [
             CLRpRegressor(k, l, weighted=w, fuzzy=f), X, y]
           params['kplane k={} l={} w={} f={} ens=10'.format(k, l, w, f)] = [
-            KPlaneRegressorEnsemble(k, l, weighted=w, fuzzy=f), X, y]
+            RegressorEnsemble(KPlaneRegressor(k, l, weighted=w, fuzzy=f)), X, y]
           params['CLR_p k={} l={} w={} f={} ens=10'.format(k, l, w, f)] = [
-            CLRpRegressorEnsemble(k, l, weighted=w, fuzzy=f), X, y]
+            RegressorEnsemble(CLRpRegressor(k, l, weighted=w, fuzzy=f)), X, y]
 
   for k in [2, 4, 6, 8]:
     for l in [0, 1, 10, 100]:
       params['CLR_c k={} l={}'.format(k, l)] = [
         CLRcRegressor(k, l, constr_id=constr_id), X, y]
       params['CLR_c k={} l={} ens=10'.format(k, l)] = [
-        CLRcRegressorEnsemble(k, l, constr_id=constr_id), X, y]
+        RegressorEnsemble(CLRcRegressor(k, l, constr_id=constr_id)), X, y]
       params['kplane k={} l={} w=size'.format(k, l)] = [
         KPlaneRegressor(k, l, weighted='size'), X, y]
       params['kplane k={} l={} w=size ens=10'.format(k, l)] = [
-        KPlaneRegressorEnsemble(k, l, weighted='size'), X, y]
+        RegressorEnsemble(KPlaneRegressor(k, l, weighted='size')), X, y]
 
   results = evaluate_all(
     params,
     file_name="results/{}-tmp1.csv".format(args.dataset),
-    n_jobs=args.njobs
+    n_jobs=args.n_jobs,
+    gl_parallel=args.global_parallel,
   )
-
   results = results.sort_values('test_mse_mean')
+
   add_params = {}
   # assuming ensembles are always best
-  algos = [CLRpRegressorEnsemble, KPlaneRegressorEnsemble]
+  algos = [CLRpRegressor, KPlaneRegressor]
   algo_names = ['CLR_p', 'kplane']
   for algo, algo_name in zip(algos, algo_names):
     for idx in results.index:
@@ -129,10 +131,10 @@ if __name__ == '__main__':
         f = idx.split()[4].split('=')[1] == 'True'
         for alpha in [0.01, 0.1, 1.0, 10.0, 100.0]:
           add_params[idx + ' Lasso {}'.format(alpha)] = [
-            algo(k, l, weighted=w, fuzzy=f, clr_lr=Lasso(alpha)), X, y
+            RegressorEnsemble(algo(k, l, weighted=w, fuzzy=f, clr_lr=Lasso(alpha))), X, y
           ]
           add_params[idx + ' Ridge {}'.format(alpha)] = [
-            algo(k, l, weighted=w, fuzzy=f, clr_lr=Ridge(alpha)), X, y
+            RegressorEnsemble(algo(k, l, weighted=w, fuzzy=f, clr_lr=Ridge(alpha))), X, y
           ]
         break
   for idx in results.index:
@@ -141,16 +143,17 @@ if __name__ == '__main__':
       l = int(idx.split()[2].split('=')[1])
       for alpha in [0.01, 0.1, 1.0, 10.0, 100.0]:
         add_params[idx + ' Lasso {}'.format(alpha)] = [
-          CLRcRegressorEnsemble(k, l, constr_id=constr_id, clr_lr=Lasso(alpha)), X, y
+          RegressorEnsemble(CLRcRegressor(k, l, constr_id=constr_id, clr_lr=Lasso(alpha))), X, y
         ]
         add_params[idx + ' Ridge {}'.format(alpha)] = [
-          CLRcRegressorEnsemble(k, l, constr_id=constr_id, clr_lr=Ridge(alpha)), X, y
+          RegressorEnsemble(CLRcRegressor(k, l, constr_id=constr_id, clr_lr=Ridge(alpha))), X, y
         ]
       break
   add_results = evaluate_all(
     add_params,
     file_name="results/{}-tmp2.csv".format(args.dataset),
-    n_jobs=args.njobs
+    n_jobs=args.n_jobs,
+    gl_parallel=args.global_parallel,
   )
 
   res_complete = results.append(add_results)

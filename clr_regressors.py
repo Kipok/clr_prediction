@@ -2,7 +2,7 @@ from __future__ import print_function
 from builtins import range
 
 import numpy as np
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, clone
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from scipy.spatial.distance import cdist
 from sklearn.ensemble import RandomForestClassifier
@@ -29,7 +29,7 @@ class CLRcRegressor(BaseEstimator):
     for i, c_id in enumerate(np.unique(X[:, self.constr_id])):
       constr[X[:, self.constr_id] == c_id] = i
 
-    self.labels_, self.models_, _ = best_clr(
+    self.labels_, self.models_, _, _ = best_clr(
       X, y, k=self.num_planes, kmeans_X=self.kmeans_coef,
       constr=constr, max_iter=max_iter, num_tries=self.num_tries,
       lr=self.clr_lr,
@@ -54,6 +54,97 @@ class CLRcRegressor(BaseEstimator):
         continue
       y_pred = self.models_[cl_idx].predict(X[test_labels == cl_idx])
       preds[test_labels == cl_idx] = y_pred
+    return preds
+
+
+class FuzzyCLRRegressor(BaseEstimator):
+  def __init__(self, num_planes, kmeans_coef,
+               clr_lr=None, num_tries=1):
+    self.num_planes = num_planes
+    self.kmeans_coef = kmeans_coef
+    self.num_tries = num_tries
+    self.clr_lr = clr_lr
+
+  def fit(self, X, y, init_labels=None, max_iter=1000,
+          seed=None, verbose=False):
+    if seed is not None:
+      np.random.seed(seed)
+    X, y = check_X_y(X, y)
+    self.labels_, self.models_, self.weights_, _ = best_clr(
+      X, y, k=self.num_planes, kmeans_X=self.kmeans_coef,
+      max_iter=max_iter, num_tries=self.num_tries,
+      lr=self.clr_lr, fuzzy=True
+    )
+    self.X_ = X
+
+  def predict(self, X):
+    check_is_fitted(self, ['labels_', 'models_', 'weights_'])
+    X = check_array(X)
+
+    preds = np.empty((X.shape[0], self.num_planes))
+    for cl_idx in range(self.num_planes):
+      preds[:, cl_idx] = self.models_[cl_idx].predict(X)
+    preds = np.sum(preds * self.weights_, axis=1)
+    return preds
+
+
+class CLRpRegressor(BaseEstimator):
+  def __init__(self, num_planes, kmeans_coef, clr_lr=None,
+               num_tries=1, clf=None, weighted=False, fuzzy=False):
+    self.num_planes = num_planes
+    self.kmeans_coef = kmeans_coef
+    self.num_tries = num_tries
+    self.weighted = weighted
+    self.clr_lr = clr_lr
+    self.fuzzy = fuzzy
+
+    if clf is None:
+      self.clf = RandomForestClassifier(n_estimators=20)
+    else:
+      self.clf = clf
+
+  def fit(self, X, y, init_labels=None, max_iter=100,
+          seed=None, verbose=False):
+    if seed is not None:
+      np.random.seed(seed)
+    X, y = check_X_y(X, y)
+    self.labels_, self.models_, _, _ = best_clr(
+      X, y, k=self.num_planes, kmeans_X=self.kmeans_coef,
+      max_iter=max_iter, num_tries=self.num_tries,
+      lr=self.clr_lr, fuzzy=self.fuzzy
+    )
+    self.X_ = X
+    if verbose:
+      label_score = self.get_label_score_()
+      print("Label prediction: {:.6f} +- {:.6f}".format(
+        label_score.mean(), label_score.std()))
+    self.clf.fit(X, self.labels_)
+
+  def get_label_score_(self):
+    return cross_val_score(self.clf, self.X_, self.labels_, cv=3).mean()
+
+  def predict(self, X):
+    check_is_fitted(self, ['labels_', 'models_'])
+    X = check_array(X)
+
+    if self.weighted:
+      if self.clf.n_classes_ == self.num_planes:
+        planes_probs = self.clf.predict_proba(X)
+      else:
+        planes_probs = np.zeros((X.shape[0], self.num_planes))
+        planes_probs[:, self.clf.classes_] = self.clf.predict_proba(X)
+      preds = np.empty((X.shape[0], self.num_planes))
+      for cl_idx in range(self.num_planes):
+        preds[:, cl_idx] = self.models_[cl_idx].predict(X)
+      preds = np.sum(preds * planes_probs, axis=1)
+    else:
+      test_labels = self.clf.predict(X)
+      preds = np.empty(X.shape[0])
+      for cl_idx in range(self.num_planes):
+        if np.sum(test_labels == cl_idx) == 0:
+          continue
+        y_pred = self.models_[cl_idx].predict(X[test_labels == cl_idx])
+        preds[test_labels == cl_idx] = y_pred
     return preds
 
 
@@ -95,69 +186,6 @@ class KPlaneLabelPredictor(BaseEstimator):
     return np.mean(self.predict(X) == y)
 
 
-class CLRpRegressor(BaseEstimator):
-  def __init__(self, num_planes, kmeans_coef, clr_lr=None,
-               num_tries=1, clf=None, weighted=False, fuzzy=False):
-    self.num_planes = num_planes
-    self.kmeans_coef = kmeans_coef
-    self.num_tries = num_tries
-    self.weighted = weighted
-    self.clr_lr = clr_lr
-    self.fuzzy = fuzzy
-
-    if clf is None:
-      # TODO: this is slooooow
-      self.clf = RandomForestClassifier(
-        n_estimators=20
-      )
-    else:
-      self.clf = clf
-
-  def fit(self, X, y, init_labels=None, max_iter=100,
-          seed=None, verbose=False):
-    if seed is not None:
-      np.random.seed(seed)
-    X, y = check_X_y(X, y)
-    self.labels_, self.models_, _ = best_clr(
-      X, y, k=self.num_planes, kmeans_X=self.kmeans_coef,
-      max_iter=max_iter, num_tries=self.num_tries,
-      lr=self.clr_lr, fuzzy=self.fuzzy
-    )
-    self.X_ = X
-    if verbose:
-      label_score = self.get_label_score_()
-      print("Label prediction: {:.6f} +- {:.6f}".format(
-        label_score.mean(), label_score.std()))
-    self.clf.fit(X, self.labels_)
-
-  def get_label_score_(self):
-    return cross_val_score(self.clf, self.X_, self.labels_, cv=3).mean()
-
-  def predict(self, X):
-    check_is_fitted(self, ['labels_', 'models_'])
-    X = check_array(X)
-
-    if self.weighted:
-      if self.clf.n_classes_ == self.num_planes:
-        planes_probs = self.clf.predict_proba(X)
-      else:
-        planes_probs = np.zeros((X.shape[0], self.num_planes))
-        planes_probs[:, self.clf.classes_] = self.clf.predict_proba(X)
-      preds = np.empty((X.shape[0], self.num_planes))
-      for cl_idx in range(self.num_planes):
-        preds[:, cl_idx] = self.models_[cl_idx].predict(X)
-      preds = np.sum(preds * planes_probs, axis=1)
-    else:
-      test_labels = self.clf.predict(X)
-      preds = np.empty(X.shape[0])
-      for cl_idx in range(self.num_planes):
-        if np.sum(test_labels == cl_idx) == 0:
-          continue
-        y_pred = self.models_[cl_idx].predict(X[test_labels == cl_idx])
-        preds[test_labels == cl_idx] = y_pred
-    return preds
-
-
 class KPlaneRegressor(CLRpRegressor):
   def __init__(self, num_planes, kmeans_coef, fuzzy=False,
                num_tries=1, weighted=False, clr_lr=None):
@@ -168,4 +196,26 @@ class KPlaneRegressor(CLRpRegressor):
       clf=KPlaneLabelPredictor(num_planes, weight_mode=weighted),
       weighted=weighted_param, clr_lr=clr_lr,
     )
+
+
+class RegressorEnsemble(BaseEstimator):
+  def __init__(self, rgr, n_estimators=10):
+    self.rgr = rgr
+    self.n_estimators = n_estimators
+    self.rgrs = []
+    for i in range(self.n_estimators):
+      self.rgrs.append(clone(self.rgr))
+
+  def fit(self, X, y, init_labels=None, max_iter=100,
+          seed=None, verbose=False):
+    if seed is not None:
+      np.random.seed(seed)
+    for i in range(self.n_estimators):
+      self.rgrs[i].fit(X, y, init_labels, max_iter, verbose=verbose)
+
+  def predict(self, X):
+    ans = np.zeros(X.shape[0])
+    for i in range(self.n_estimators):
+      ans += self.rgrs[i].predict(X)
+    return ans / len(self.rgrs)
 
