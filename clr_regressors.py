@@ -4,15 +4,16 @@ from builtins import range
 import numpy as np
 from sklearn.base import BaseEstimator, clone
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
-from scipy.spatial.distance import cdist
+# from scipy.spatial.distance import cdist
+from sklearn.metrics.pairwise import pairwise_distances as cdist
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
 from clr import best_clr
 
 
 class CLRcRegressor(BaseEstimator):
-  def __init__(self, num_planes, kmeans_coef,
-               constr_id, num_tries=1, clr_lr=None):
+  def __init__(self, num_planes, kmeans_coef, constr_id,
+               num_tries=1, clr_lr=None):
     self.num_planes = num_planes
     self.kmeans_coef = kmeans_coef
     self.num_tries = num_tries
@@ -23,7 +24,6 @@ class CLRcRegressor(BaseEstimator):
           seed=None, verbose=False):
     if seed is not None:
       np.random.seed(seed)
-    X, y = check_X_y(X, y)
 
     constr = np.empty(X.shape[0], dtype=np.int)
     for i, c_id in enumerate(np.unique(X[:, self.constr_id])):
@@ -39,14 +39,21 @@ class CLRcRegressor(BaseEstimator):
     for i in range(X.shape[0]):
       self.constr_to_label[X[i, self.constr_id]] = self.labels_[i]
 
-  def predict(self, X):
+  def init_fit(self, labels, models, constr_to_label):
+    self.labels_ = labels
+    self.models_ = models
+    self.constr_to_label = constr_to_label
+
+  def predict(self, X, test_constr=None):
     check_is_fitted(self, ['labels_', 'models_'])
-    X = check_array(X)
+
+    if test_constr is None:
+      test_constr = X[:, self.constr_id]
 
     # TODO: optimize this
     test_labels = np.zeros(X.shape[0], np.int)
     for i in range(X.shape[0]):
-      test_labels[i] = self.constr_to_label[X[i, self.constr_id]]
+      test_labels[i] = self.constr_to_label[test_constr[i]]
 
     preds = np.empty(X.shape[0])
     for cl_idx in range(self.num_planes):
@@ -65,11 +72,10 @@ class FuzzyCLRRegressor(BaseEstimator):
     self.num_tries = num_tries
     self.clr_lr = clr_lr
 
-  def fit(self, X, y, init_labels=None, max_iter=1000,
+  def fit(self, X, y, init_labels=None, max_iter=100,
           seed=None, verbose=False):
     if seed is not None:
       np.random.seed(seed)
-    X, y = check_X_y(X, y)
     self.labels_, self.models_, self.weights_, _ = best_clr(
       X, y, k=self.num_planes, kmeans_X=self.kmeans_coef,
       max_iter=max_iter, num_tries=self.num_tries,
@@ -79,7 +85,6 @@ class FuzzyCLRRegressor(BaseEstimator):
 
   def predict(self, X):
     check_is_fitted(self, ['labels_', 'models_', 'weights_'])
-    X = check_array(X)
 
     preds = np.empty((X.shape[0], self.num_planes))
     for cl_idx in range(self.num_planes):
@@ -107,7 +112,6 @@ class CLRpRegressor(BaseEstimator):
           seed=None, verbose=False):
     if seed is not None:
       np.random.seed(seed)
-    X, y = check_X_y(X, y)
     self.labels_, self.models_, _, _ = best_clr(
       X, y, k=self.num_planes, kmeans_X=self.kmeans_coef,
       max_iter=max_iter, num_tries=self.num_tries,
@@ -120,12 +124,17 @@ class CLRpRegressor(BaseEstimator):
         label_score.mean(), label_score.std()))
     self.clf.fit(X, self.labels_)
 
+  def init_fit(self, X, labels, models):
+    self.labels_ = labels
+    self.models_ = models
+    self.X_ = X
+    self.clf.fit(X, self.labels_)
+
   def get_label_score_(self):
     return cross_val_score(self.clf, self.X_, self.labels_, cv=3).mean()
 
   def predict(self, X):
     check_is_fitted(self, ['labels_', 'models_'])
-    X = check_array(X)
 
     if self.weighted:
       if self.clf.n_classes_ == self.num_planes:
