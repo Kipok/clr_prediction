@@ -82,15 +82,10 @@ def evaluate_par(run_params, file_name='results.csv', n_jobs=4):
 
 def evaluate_seq(run_params, file_name='results.csv', n_jobs=4):
   results = None
-  if file_name == 'results/abalone-tmp1.csv':
-    results = pd.read_csv('results/abalone-tmp1-old.csv', index_col=0)
   total = len(run_params)
   for i, (name, pm) in enumerate(run_params.items()):
     print('Processing {}/{}: {}'.format(i+1, total, name), end="\r")
     sys.stdout.flush()
-    if results is not None and name in results.index:
-      print('Processed {}/{}: {} [read old]'.format(i+1, total, name))
-      continue
     tm = time.time()
     res_scores = evaluate(*pm, n_jobs=n_jobs)
     print('Processed {}/{}: {} [mse = {:.6f}, time = {:.2f}s]'.format(
