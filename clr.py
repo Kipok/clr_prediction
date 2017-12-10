@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.metrics import r2_score, mean_squared_error as mse_score
 from sklearn.linear_model import Ridge, LinearRegression
 from sklearn.base import clone
+import scipy.sparse as ssp
 
 
 def reassign_labels(scores, constr):
@@ -33,8 +34,8 @@ def fuzzy_clr(X, y, k, kmeans_X=0.0,
     # M step
     for cl_idx in range(k):
       q_sqrt = np.sqrt(q[:, cl_idx])
-      q_sum = np.sum(q[:, cl_idx])
       models[cl_idx].fit(q_sqrt[:,np.newaxis] * X, q_sqrt * y)
+      q_sum = np.sum(q[:, cl_idx])
       centers[cl_idx] = np.sum(q[:, cl_idx:cl_idx+1] * X, axis=0) / q_sum
       lmbda[cl_idx] = q_sum / X.shape[0]
       sigma_sq[cl_idx] = np.sum(q[:, cl_idx] * (
@@ -95,7 +96,7 @@ def clr(X, y, k, kmeans_X=0.0, constr=None, lr=None,
         continue
       if kmeans_X > 0:
         center = np.mean(X[labels == cl_idx], axis=0)
-        scores[:, cl_idx] += kmeans_X * np.sum((X - center) ** 2, axis=1)
+        scores[:, cl_idx] += kmeans_X * np.asarray(np.sum(np.square(X - center), axis=1)).squeeze()
     labels_prev = labels.copy()
     labels = reassign_labels(scores, constr)
     if verbose > 1:
@@ -119,7 +120,7 @@ def clr(X, y, k, kmeans_X=0.0, constr=None, lr=None,
 
 def best_clr(X, y, k, fuzzy=False, num_tries=10, **kwargs):
   clr_func = fuzzy_clr if fuzzy else clr
-  best_obj = 1e9
+  best_obj = np.inf
   for i in range(num_tries):
     labels, models, weights, obj = clr_func(X, y, k, **kwargs)
     if obj < best_obj:
