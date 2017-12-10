@@ -34,7 +34,7 @@ if __name__ == '__main__':
   parser.add_argument('--n_jobs', default=1, type=int)
   parser.add_argument('--global_parallel', dest='global_parallel', action='store_true')
   args = parser.parse_args()
-  np.random.seed(0)
+  np.random.seed(args.seed)
 
   if args.dataset == 'boston':
     boston = load_boston()
