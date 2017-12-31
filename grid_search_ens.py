@@ -62,19 +62,18 @@ if __name__ == '__main__':
 
   params = {}
 
-  for k in [8]:
+  for k in [2, 8]:
     for ens in range(1, 21):
       params['kplane k={} ens={}'.format(k, ens)] = [
-        RegressorEnsemble(KPlaneRegressor(k, 100), n_estimators=ens), X, y]
+        RegressorEnsemble(KPlaneRegressor(k, 100), n_estimators=ens), X, y, 10, 20]
       params['CLR_p k={} ens={}'.format(k, ens)] = [
-        RegressorEnsemble(CLRpRegressor(k, 10, weighted=True), n_estimators=ens), X, y]
+        RegressorEnsemble(CLRpRegressor(k, 10, weighted=True), n_estimators=ens), X, y, 10, 20]
       params['CLR_c k={} ens={}'.format(k, ens)] = [
-        RegressorEnsemble(CLRcRegressor(k, 10, constr_id=constr_id), n_estimators=ens), X, y]
-
+        RegressorEnsemble(CLRcRegressor(k, 10, constr_id=constr_id), n_estimators=ens), X, y, 10, 20]
 
   results = evaluate_all(
     params,
-    file_name="results_ens/{}-8.csv".format(args.dataset),
+    file_name="results_ens/{}.csv".format(args.dataset),
     n_jobs=args.n_jobs,
     gl_parallel=args.global_parallel,
   )
