@@ -9,7 +9,7 @@ import os
 
 from sklearn.datasets import load_boston
 
-from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, LogisticRegression
 from sklearn.svm import SVR
 from sklearn.ensemble import RandomForestRegressor
 
@@ -94,10 +94,14 @@ if __name__ == '__main__':
             KPlaneRegressor(k, l, weighted=w, fuzzy=f), X, y]
           params['CLR_p k={} l={} w={} f={}'.format(k, l, w, f)] = [
             CLRpRegressor(k, l, weighted=w, fuzzy=f), X, y]
+          params['CLR_p LR=1.0 k={} l={} w={} f={}'.format(k, l, w, f)] = [
+            CLRpRegressor(k, l, weighted=w, fuzzy=f, clf=LogisticRegression()), X, y]
           params['kplane k={} l={} w={} f={} ens=10'.format(k, l, w, f)] = [
             RegressorEnsemble(KPlaneRegressor(k, l, weighted=w, fuzzy=f)), X, y]
           params['CLR_p k={} l={} w={} f={} ens=10'.format(k, l, w, f)] = [
             RegressorEnsemble(CLRpRegressor(k, l, weighted=w, fuzzy=f)), X, y]
+          params['CLR_p LR=1.0 k={} l={} w={} f={} ens=10'.format(k, l, w, f)] = [
+            RegressorEnsemble(CLRpRegressor(k, l, weighted=w, fuzzy=f, clf=LogisticRegression())), X, y]
 
   for k in [2, 4, 6, 8]:
     for l in [0, 1, 10, 100]:
