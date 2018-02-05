@@ -12,13 +12,24 @@ def reassign_labels(scores, constr):
   if constr is None:
     return np.argmin(scores, axis=1)
   labels = np.empty(scores.shape[0], dtype=np.int)
+  # TODO: make faster?
   for c_id in range(constr.max() + 1):
     labels[constr == c_id] = np.argmin(np.mean(scores[constr == c_id], axis=0))
   return labels
 
+# this is slower than a loop
+#def reassign_labels_vect(scores, constr):
+#  constr_size = constr.max() + 1
+#  big_idx = constr[:,np.newaxis] == np.arange(constr_size)
+#  arg_min = np.argmin((np.broadcast_to(scores[:,np.newaxis],
+#                                       (scores.shape[0], constr_size, scores.shape[1])) *
+#                       big_idx[:,:,np.newaxis]).sum(axis=0) /
+#                       big_idx.sum(axis=0)[:,np.newaxis], axis=1)
+#  return np.sum(big_idx * arg_min, axis=1)
+
 
 def fuzzy_clr(X, y, k, kmeans_X=0.0,
-              max_iter=100, verbose=0, lr=None):
+              max_iter=5, verbose=0, lr=None):
   if lr is None:
     lr = Ridge(alpha=1e-5)
   models = [clone(lr) for i in range(k)]
@@ -72,7 +83,7 @@ def fuzzy_clr(X, y, k, kmeans_X=0.0,
 
 
 def clr(X, y, k, kmeans_X=0.0, constr=None, lr=None,
-        max_iter=100, labels=None, verbose=0):
+        max_iter=5, labels=None, verbose=0):
   if labels is None:
     labels = np.random.choice(k, size=X.shape[0])
   if lr is None:

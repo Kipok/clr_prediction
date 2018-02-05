@@ -13,14 +13,15 @@ from clr import best_clr
 
 class CLRcRegressor(BaseEstimator):
   def __init__(self, num_planes, kmeans_coef, constr_id,
-               num_tries=1, clr_lr=None):
+               num_tries=1, clr_lr=None, max_iter=5):
     self.num_planes = num_planes
     self.kmeans_coef = kmeans_coef
     self.num_tries = num_tries
     self.constr_id = constr_id
     self.clr_lr = clr_lr
+    self.max_iter = max_iter
 
-  def fit(self, X, y, init_labels=None, max_iter=100,
+  def fit(self, X, y, init_labels=None,
           seed=None, verbose=False):
     if seed is not None:
       np.random.seed(seed)
@@ -31,7 +32,7 @@ class CLRcRegressor(BaseEstimator):
 
     self.labels_, self.models_, _, _ = best_clr(
       X, y, k=self.num_planes, kmeans_X=self.kmeans_coef,
-      constr=constr, max_iter=max_iter, num_tries=self.num_tries,
+      constr=constr, max_iter=self.max_iter, num_tries=self.num_tries,
       lr=self.clr_lr,
     )
     # TODO: optimize this
@@ -72,7 +73,7 @@ class FuzzyCLRRegressor(BaseEstimator):
     self.num_tries = num_tries
     self.clr_lr = clr_lr
 
-  def fit(self, X, y, init_labels=None, max_iter=100,
+  def fit(self, X, y, init_labels=None, max_iter=20,
           seed=None, verbose=False):
     if seed is not None:
       np.random.seed(seed)
@@ -94,7 +95,7 @@ class FuzzyCLRRegressor(BaseEstimator):
 
 
 class CLRpRegressor(BaseEstimator):
-  def __init__(self, num_planes, kmeans_coef, clr_lr=None,
+  def __init__(self, num_planes, kmeans_coef, clr_lr=None, max_iter=5,
                num_tries=1, clf=None, weighted=False, fuzzy=False):
     self.num_planes = num_planes
     self.kmeans_coef = kmeans_coef
@@ -102,19 +103,20 @@ class CLRpRegressor(BaseEstimator):
     self.weighted = weighted
     self.clr_lr = clr_lr
     self.fuzzy = fuzzy
+    self.max_iter = max_iter
 
     if clf is None:
       self.clf = RandomForestClassifier(n_estimators=20)
     else:
       self.clf = clf
 
-  def fit(self, X, y, init_labels=None, max_iter=100,
+  def fit(self, X, y, init_labels=None,
           seed=None, verbose=False):
     if seed is not None:
       np.random.seed(seed)
     self.labels_, self.models_, _, _ = best_clr(
       X, y, k=self.num_planes, kmeans_X=self.kmeans_coef,
-      max_iter=max_iter, num_tries=self.num_tries,
+      max_iter=self.max_iter, num_tries=self.num_tries,
       lr=self.clr_lr, fuzzy=self.fuzzy
     )
     self.X_ = X
@@ -122,6 +124,8 @@ class CLRpRegressor(BaseEstimator):
       label_score = self.get_label_score_()
       print("Label prediction: {:.6f} +- {:.6f}".format(
         label_score.mean(), label_score.std()))
+    if np.unique(self.labels_).shape[0] == 1:
+      self.labels_[0] = 1 if self.labels_[0] == 0 else 0
     self.clf.fit(X, self.labels_)
 
   def init_fit(self, X, labels, models):
@@ -137,7 +141,7 @@ class CLRpRegressor(BaseEstimator):
     check_is_fitted(self, ['labels_', 'models_'])
 
     if self.weighted:
-      if self.clf.n_classes_ == self.num_planes:
+      if 'n_classes_' in self.clf.__dict__ and self.clf.n_classes_ == self.num_planes:
         planes_probs = self.clf.predict_proba(X)
       else:
         planes_probs = np.zeros((X.shape[0], self.num_planes))
@@ -196,12 +200,12 @@ class KPlaneLabelPredictor(BaseEstimator):
 
 
 class KPlaneRegressor(CLRpRegressor):
-  def __init__(self, num_planes, kmeans_coef, fuzzy=False,
+  def __init__(self, num_planes, kmeans_coef, fuzzy=False, max_iter=5,
                num_tries=1, weighted=False, clr_lr=None):
     weighted_param = True if weighted == 'size' else weighted
     super(KPlaneRegressor, self).__init__(
       num_planes, kmeans_coef,
-      num_tries=num_tries, fuzzy=fuzzy,
+      num_tries=num_tries, fuzzy=fuzzy, max_iter=max_iter,
       clf=KPlaneLabelPredictor(num_planes, weight_mode=weighted),
       weighted=weighted_param, clr_lr=clr_lr,
     )
@@ -215,12 +219,12 @@ class RegressorEnsemble(BaseEstimator):
     for i in range(self.n_estimators):
       self.rgrs.append(clone(self.rgr))
 
-  def fit(self, X, y, init_labels=None, max_iter=100,
+  def fit(self, X, y, init_labels=None,
           seed=None, verbose=False):
     if seed is not None:
       np.random.seed(seed)
     for i in range(self.n_estimators):
-      self.rgrs[i].fit(X, y, init_labels, max_iter, verbose=verbose)
+      self.rgrs[i].fit(X, y, init_labels, verbose=verbose)
 
   def predict(self, X):
     ans = np.zeros(X.shape[0])
