@@ -6,10 +6,11 @@ import pandas as pd
 import sys
 import argparse
 import os
+import time
 
 from scipy.sparse import csc_matrix
 
-from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, LogisticRegression
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 
 from clr_regressors import KPlaneRegressor, CLRpRegressor, CLRcRegressor
@@ -71,37 +72,50 @@ if __name__ == '__main__':
     )
 
   if args.run_clrs:
+    print("Run clrs")
     if args.n_jobs == 1:
       for k in [2, 4, 6, 8]:
-        for l in [0, 1, 10, 100, 1000]:
-          gen_clrs(k, l, X, y, max_iter=20, n_estimators=1)
-          gen_clrs(k, l, X, y, max_iter=20, n_estimators=1, constr=constr)
+        for l in [0, 1, 10, 100, 1000, 10000]:
+          tm = time.time()
+          gen_clrs(k, l, X, y, max_iter=5, n_estimators=10)
+          print("k={}, l={}, time={}".format(k, l, time.time() - tm))
+          tm = time.time()
+          gen_clrs(k, l, X, y, max_iter=5, constr=constr, n_estimators=10)
+          print("k={}, l={}, constr, time={}".format(k, l, time.time() - tm))
     else:
       pms = []
       for k in [2, 4, 6, 8]:
-        for l in [0, 1, 10, 100, 1000]:
+        for l in [0, 1, 10, 100, 1000, 10000]:
           for c in [constr, None]:
-            pms.append([k, l, X, y, 30, 3, 10, c])
+            pms.append([k, l, X, y, 5, 3, 10, c])
       p = Pool(args.n_jobs)
       p.map(lambda_gen_clrs, pms)
       p.terminate()
 
   if args.eval_algos:
+    print("Eval algos")
     for k in [2, 4, 6, 8]:
-      for l in [0, 1, 10, 100, 1000]:
+      for l in [0, 1, 10, 100, 1000, 10000]:
         kmeans_X = l
+        tm = time.time()
         algo = CLRcRegressor(k, kmeans_X, -1)
         algo_name = 'CLR_c k={} l={}'.format(k, kmeans_X)
         res = eval_algo_constr(algo, algo_name, X, y, constr, k, kmeans_X)
         if results is None:
           results = res
         results = results.append(res)
+        print("k={}, l={}, CONSTR time={}".format(k, l, time.time() - tm))
 
+        tm = time.time()
         algo = KPlaneRegressor(k, kmeans_X, weighted=False)
         algo_name = 'kplane k={} l={}'.format(k, kmeans_X)
-        res = eval_algo(algo, algo_name, X, y, k, kmeans_X, n_estimators=3)
+        res = eval_algo(algo, algo_name, X, y, k, kmeans_X)
+        if results is None:
+          results = res
         results = results.append(res)
+        print("k={}, l={}, KP time={}".format(k, l, time.time() - tm))
 
+        tm = time.time()
         algo = CLRpRegressor(
           k, kmeans_X, weighted=False,
           clf = RandomForestClassifier(
@@ -109,25 +123,53 @@ if __name__ == '__main__':
           ),
         )
         algo_name = 'CLR_p k={} l={}'.format(k, kmeans_X)
-        res = eval_algo(algo, algo_name, X, y, k, kmeans_X, n_estimators=3)
+        res = eval_algo(algo, algo_name, X, y, k, kmeans_X)
         results = results.append(res)
-        results.to_csv('results/patient-claims-algos.csv')
+        print("k={}, l={}, RF time={}".format(k, l, time.time() - tm))
+
+        tm = time.time()
+        algo = CLRpRegressor(
+          k, kmeans_X, weighted=False,
+          clf = LogisticRegression(),
+        )
+        algo_name = 'CLR_p LR k={} l={}'.format(k, kmeans_X)
+        res = eval_algo(algo, algo_name, X, y, k, kmeans_X)
+        results = results.append(res)
+        print("k={}, l={}, LR time={}".format(k, l, time.time() - tm))
+        results.to_csv('results/patient-claims-algos-1.csv')
 
   if args.eval_best_ens:
-    k, kmeans_X = 8, 1
+    print("Eval best ens")
+    k, kmeans_X = 8, 0
+    tm = time.time()
     algo = CLRcRegressor(k, kmeans_X, -1)
     algo_name = 'CLR_c k={} l={}'.format(k, kmeans_X)
     res = eval_algo_constr(algo, algo_name, X, y, constr, k, kmeans_X, n_estimators=10, use_est=True)
     if results is None:
       results = res
+    print("k={}, l={}, CONSTR time={}".format(k, kmeans_X, time.time() - tm))
     results = results.append(res)
 
-    k, kmeans_X = 8, 1000
+    tm = time.time()
+    k, kmeans_X = 8, 10000
     algo = KPlaneRegressor(k, kmeans_X, weighted=False)
     algo_name = 'kplane k={} l={}'.format(k, kmeans_X)
     res = eval_algo(algo, algo_name, X, y, k, kmeans_X, n_estimators=10, use_est=True)
     results = results.append(res)
+    print("k={}, l={}, KP time={}".format(k, kmeans_X, time.time() - tm))
 
+    tm = time.time()
+    k, kmeans_X = 4, 10000
+    algo = CLRpRegressor(
+      k, kmeans_X, weighted=True,
+      clf=LogisticRegression(),
+    )
+    algo_name = 'CLR_p LR k={} l={}'.format(k, kmeans_X)
+    res = eval_algo(algo, algo_name, X, y, k, kmeans_X, n_estimators=10, use_est=True)
+    results = results.append(res)
+    print("k={}, l={}, LR time={}".format(k, kmeans_X, time.time() - tm))
+
+    tm = time.time()
     k, kmeans_X = 2, 0
     algo = CLRpRegressor(
       k, kmeans_X, weighted=False,
@@ -138,5 +180,6 @@ if __name__ == '__main__':
     algo_name = 'CLR_p k={} l={}'.format(k, kmeans_X)
     res = eval_algo(algo, algo_name, X, y, k, kmeans_X, n_estimators=10, use_est=True)
     results = results.append(res)
-    results.to_csv('results/patient-claims-best-ens.csv')
+    print("k={}, l={}, RF time={}".format(k, kmeans_X, time.time() - tm))
+    results.to_csv('results/patient-claims-best-ens-1.csv')
 
